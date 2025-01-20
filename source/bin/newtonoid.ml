@@ -49,7 +49,4 @@ let draw flux_etat =
   Graphics.close_graph ()
 ;; 
 
-(* let () = (game_launch graphic_format) *)
-game_launch graphic_format ;
-
-print_endline "Hello world !";
+let () = (game_launch graphic_format)
