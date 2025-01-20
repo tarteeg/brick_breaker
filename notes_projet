@@ -1,0 +1,17 @@
+
+
+- Balle : 3 flux : position, vitesse, accélération (x,y)
+- Raquette : 2 flux : position, vitesse (x,y)
+- Brique : position (pas à cheval sur plusieurs rectangle du quadtree), effet, valeur, cassure : effet d'une monade
+- Murs : 
+- Effets : Monade
+- Score Board : 
+
+
+- Détection de colision : AABB 
+- Gestion de l'espace de jeu : quadtree
+
+- Module balle
+- Module raquette
+- Module briques
+- Module écran 
