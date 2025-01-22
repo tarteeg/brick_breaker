@@ -49,4 +49,4 @@ let draw flux_etat =
   Graphics.close_graph ()
 ;; 
 
-let () = (game_launch graphic_format)
+let _ = (game_launch graphic_format)

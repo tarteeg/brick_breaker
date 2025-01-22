@@ -1,15 +1,25 @@
 open Iterator
 
-val radius : int
+(* Module abstrayant une balle *)
+module type Ball = 
+sig
+    type p
 
-val p_initiale : (float * float)
-val s_initiale : (float * float)
-val a_initiale : (float * float)
-val init_ball : unit -> unit 
+    (* Type représentant l'état de la balle *)
+    type ball_state
 
-val position : (float * float) flux
-val speed : (float * float) flux
-val acceleration : (float * float) flux
+    val radius : int
 
-val print_ball : (float * float) flux -> unit
+    val p_initiale : p
+    val s_initiale : p
+    val a_initiale : p
+    (* val init_ball : unit -> unit *)
 
+    val position : p flux
+    val speed : p flux
+    val acceleration : p flux
+
+    (* val print_ball : (float * float) flux -> unit *)
+end
+
+module B : Ball
