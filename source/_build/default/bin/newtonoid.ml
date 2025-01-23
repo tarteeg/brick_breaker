@@ -20,12 +20,12 @@ module type Frame =
 (* Parametres globaux d'initialisation du jeu *)
 (* dt : pas de temps                          *)
 (* marge : paire d'abscisses (xmin, xmax)     *)
-(* infx : paire d'abscisses (xmin, xmax)     *)
-(* infy : paire d'abscisses (xmin, xmax)     *)
-(* supx : paire d'abscisses (xmin, xmax)     *)
-(* supy : paire d'abscisses (xmin, xmax)     *)
+(* infx : paire d'abscisses (xmin, xmax)      *)
+(* infy : paire d'abscisses (xmin, xmax)      *)
+(* supx : paire d'abscisses (xmin, xmax)      *)
+(* supy : paire d'abscisses (xmin, xmax)      *)
 module Init : Frame = struct
-  let dt = 10. (* 60 Hz *)
+  let dt = 0.01 (* 60 Hz *)
   let marge = 10.
   let infx = 10.
   let infy = 10.
@@ -42,7 +42,9 @@ end
 let integre dt flux =
   (* valeur initiale de l'intégrateur                         *)
   let init = Pair ( 0., 0.) in
-  (* fonction auxiliaire de calcul de acc_{i} + dt * flux_{i} *)
+  (* fonction auxiliaire de calcul de acc_{i} + dt * flux_{i}
+  
+  *)
   let iter (Pair (acc1, acc2)) (Pair (flux1, flux2)) =
     Pair (acc1 +. dt *. flux1, acc2 +. dt *. flux2) in
   (* définition récursive du flux acc                         *)
@@ -53,6 +55,27 @@ let integre dt flux =
 let g = 9.81
 module Game (F : Frame) = 
 struct
+  let update_ball ball = match ball with 
+  |Ball (Pair (bx,by), Pair (vx,vy)) -> 
+
+    let new_vx = 
+      if bx < Init.infx || bx > Init.supx then -.vx else vx in
+    let new_vy = 
+      if by > Init.supy then -.vy else vy in
+    
+    Ball (Pair (bx+.new_vx,by+.new_vy), Pair (new_vx,new_vy))
+  |_ -> failwith "Erreur : ball inconnue"
+
+  let update_raquette raquette = match raquette with 
+  |Raquette (Pair (rx,ry)) -> Raquette (Pair (rx,ry))
+  |_ -> failwith "Erreur : raquette inconnue"
+
+  let update_state state = match state with 
+    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)))) ->
+      Some (State (update_ball (Ball (Pair (bx,by), Pair (dx,dy))), update_raquette (Raquette (Pair (rx,ry)))))
+    | None -> failwith "Erreur : etat inconnu"
+    | _ -> failwith "Erreur : etat inconnu"
+
   let ( |+| ) (Pair (x1,y1)) (Pair (x2,y2)) = Pair (x1 +. x2, y1 +. y2)
   let run : etat -> etat option Flux.t = 
     fun (State (Ball (pos0,vit0), raquette)) -> 
@@ -71,7 +94,7 @@ struct
       (int_of_float ((2. *. Init.marge) +. Init.supy -. Init.infy))
 
   (* extrait le score courant d'un etat : *)
-  let score etat : int = failwith "A DEFINIR" 
+  let score etat : int = 0 
   
   let draw_state etat =
     match etat with 
@@ -86,12 +109,6 @@ struct
         end
     (* failwith "A DEFINIR" *)
 
-  let update_state : etat option -> etat option = function
-    | None -> None
-    | Some (State (Ball (Pair (x, y), Pair (dx, dy)), raquette)) ->
-        Some (State (Ball (Pair (x, y -. g ), Pair (dx, dy -. g )), raquette))
-
-
   let draw flux_etat =
     let rec loop flux_etat last_score =
       match Flux.(uncons flux_etat) with
@@ -101,8 +118,7 @@ struct
 
         Graphics.clear_graph ();
         (* DESSIN ETAT *)
-        draw_state (update_state etat); 
-        Debug.print_state (update_state etat);
+        draw_state etat;
         (* FIN DESSIN ETAT *)
         Graphics.synchronize ();
         Unix.sleepf Init.dt;
@@ -134,12 +150,17 @@ let briques = Brick [
   Pair (400., 500.)
 ]
 *)
-let etat0 = State (balle, raquette)
+let etat0 = Some (State (balle, raquette))
 
 module G = Game(Init)
 module D = Drawing(Init)
-let _ = D.draw(G.run(etat0))
 
+let _ = 
+  let flux_etat = Flux.unfold (fun state -> Some (state, G.update_state state)) etat0 in 
+  D.draw (flux_etat)
 
+(*
+  D.draw(G.run(etat0))
+*)
 
 (* let _ = (game_launch graphic_format) *)
