@@ -4,15 +4,8 @@ open Iterator
 
 (* exemple d'ouvertue d'un tel module de la bibliotheque : *)
 open Game
-
-type 'a pair = Pair of float * float
-
-type ('pos, 'vel) ball = Ball of 'pos pair * 'vel pair
-type raquette = Raquette of float pair
-type briques = Brick of float pair list
-
-type etat = 
-  | State : ('pos, 'vel) ball * raquette -> etat
+open Types
+open Debug
 
 module type Frame =
   sig
@@ -32,7 +25,7 @@ module type Frame =
 (* supx : paire d'abscisses (xmin, xmax)     *)
 (* supy : paire d'abscisses (xmin, xmax)     *)
 module Init : Frame = struct
-  let dt = 60. /. 1000. (* 60 Hz *)
+  let dt = 10. (* 60 Hz *)
   let marge = 10.
   let infx = 10.
   let infy = 10.
@@ -96,7 +89,7 @@ struct
   let update_state : etat option -> etat option = function
     | None -> None
     | Some (State (Ball (Pair (x, y), Pair (dx, dy)), raquette)) ->
-        Some (State (Ball (Pair (x, y -. g *. F.dt), Pair (dx, dy -. g *. F.dt)), raquette))
+        Some (State (Ball (Pair (x, y -. g ), Pair (dx, dy -. g )), raquette))
 
 
   let draw flux_etat =
@@ -104,17 +97,18 @@ struct
       match Flux.(uncons flux_etat) with
       | None -> last_score
       | Some (etat, flux_etat') ->
+        Debug.print_state etat;
 
-        print_endline "TEEEEST!";
         Graphics.clear_graph ();
         (* DESSIN ETAT *)
-        let maj_state = update_state etat in
-        draw_state maj_state; 
+        draw_state (update_state etat); 
+        Debug.print_state (update_state etat);
         (* FIN DESSIN ETAT *)
         Graphics.synchronize ();
         Unix.sleepf Init.dt;
-
-        loop (Flux.cons (maj_state) flux_etat') (last_score + score etat);
+        
+        (* Maj du flux *)
+        loop (flux_etat') (last_score + score etat);
       | _ -> assert false
     in
     Graphics.open_graph graphic_format;
@@ -139,7 +133,6 @@ let briques = Brick [
   Pair (300., 500.);
   Pair (400., 500.)
 ]
-
 *)
 let etat0 = State (balle, raquette)
 
