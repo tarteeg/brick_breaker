@@ -54,6 +54,13 @@ module InitTailleRaquette : InitPair = struct
   let y = 10. (* Hauteur *)
 end
 
+(* Taille standard d'une brique *)
+(* On fixe la taille d'une brique puis on ajuste le nombre de briques par lignes (nous aurions pu faire l'inverse) *)
+module InitTailleBriques : InitPair = struct
+  let x = 70. (* Largeur *)
+  let y = 20. (* Hauteur *)
+end
+
 (* Initialisation de la partie *)
 module InitGame = struct
 
@@ -67,12 +74,43 @@ module InitGame = struct
   let raquette = Raquette pos_raquette
 
   (* Initialisation des briques *)
+  let espace_briques = 10. 
+  let max_columns = int_of_float ((InitFenetre.supx -. InitFenetre.infx -. InitFenetre.marge) /. (InitTailleBriques.x +. espace_briques))
+  let max_lignes = int_of_float ((InitFenetre.supy /. 2. -. InitFenetre.infy -. InitFenetre.marge) /. (InitTailleBriques.y +. espace_briques))
+
+  (* CONTRAT
+  Fonction qui crée les briques selon un pattern "rectangulaire" sur la fenêtre de jeu
+  Argument max_c : int : nombre de colonnes  
+  Argument max_l : int : nombre de lignes 
+  Préconditions : max_c >= 0 ET max_l >= 0
+  Postconditions : 
+      (1) La liste de briques est de taille max_c * max_l
+      (2) Il y a max_c briques par ligne
+      (3) Il y a max_l briques par colonne
+      (4) Aucune briques ne se chevauchent
+  *)
+  let rec create_briques max_c max_l =
+    let rec aux col_actuelle ligne_actuelle l =
+      if ligne_actuelle = max_l then l
+      else if col_actuelle = max_c then aux 0 (ligne_actuelle + 1) l
+      else
+        let total_width = (float_of_int max_c) *. (InitTailleBriques.x +. espace_briques) -. espace_briques in
+        let x = (InitFenetre.supx -. InitFenetre.infx -. total_width) /. 2. +. InitFenetre.infx +. (float_of_int col_actuelle) *. (InitTailleBriques.x +. espace_briques) in
+        let y = InitFenetre.supy /. 2. +. InitFenetre.marge +. (float_of_int ligne_actuelle) *. (InitTailleBriques.y +. espace_briques) in
+        aux (col_actuelle + 1) ligne_actuelle (create_brick x y InitTailleBriques.x InitTailleBriques.y :: l)
+    in
+    aux 0 0 []
+
+  let briques = create_briques max_columns max_lignes
+
+  (*
   let briques = [
     create_brick 100. 500. 70. 20.;
     create_brick 200. 500. 70. 20.;
     create_brick 300. 500. 70. 20.;
     create_brick 400. 500. 70. 20.;
   ]
+  *)
 
   let etat_init = Some (State (balle, raquette, briques))
 end 
@@ -115,9 +153,7 @@ struct
   (* Gestion des collisions avec les briques *)
   let handle_collision ball brick =
     let Ball (Pair (bx, by), Pair (vx, vy)) = ball in
-    let Pair (rx, ry) = brick.position in
-    let brick_width = brick.width in
-    let brick_height = brick.height in
+    let Brique (Pair (rx, ry), Pair (brick_width, brick_height), _) = brick in
   
     if is_colliding ball brick then
       (* Déterminer si la collision est sur un bord horizontal ou vertical *)

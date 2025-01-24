@@ -52,9 +52,9 @@ struct
           Graphics.fill_rect (int_of_float rx) (int_of_float ry) 100 10 ;
 
           let draw_brick brick =
-            if not brick.is_broken then
-              let Pair (x, y) = brick.position in
-              Graphics.fill_rect (int_of_float x) (int_of_float y) (int_of_float brick.width) (int_of_float brick.height)
+            let Brique (Pair (x, y), Pair (width, height), is_broken) = brick in
+            if not is_broken then
+              Graphics.fill_rect (int_of_float x) (int_of_float y) (int_of_float width) (int_of_float height)
           in
           let draw_bricks bricks =
             List.iter draw_brick bricks
@@ -75,7 +75,7 @@ struct
         (* FIN DESSIN ETAT *)
         Graphics.synchronize ();
         Unix.sleepf InitFenetre.dt;
-        
+
         (* Maj du flux *)
         loop (flux_etat') (last_score + score etat);
       | _ -> assert false

@@ -54,6 +54,13 @@ module InitTailleRaquette : InitPair = struct
   let y = 10. (* Hauteur *)
 end
 
+(* Taille standard d'une brique *)
+(* On fixe la taille d'une brique puis on ajuste le nombre de briques par lignes (nous aurions pu faire l'inverse) *)
+module InitTailleBriques : InitPair = struct
+  let x = 70. (* Largeur *)
+  let y = 20. (* Hauteur *)
+end
+
 (* Initialisation de la partie *)
 module InitGame = struct
 
@@ -66,7 +73,46 @@ module InitGame = struct
   let pos_raquette = Pair (InitPosRaquette.x, InitPosRaquette.y)
   let raquette = Raquette pos_raquette
 
-  let etat_init = Some (State (balle, raquette))
+  (* Initialisation des briques *)
+  let espace_briques = 10. 
+  let max_columns = int_of_float ((InitFenetre.supx -. InitFenetre.infx -. InitFenetre.marge) /. (InitTailleBriques.x +. espace_briques))
+  let max_lignes = int_of_float ((InitFenetre.supy /. 2. -. InitFenetre.infy -. InitFenetre.marge) /. (InitTailleBriques.y +. espace_briques))
+
+  (* CONTRAT
+  Fonction qui crée les briques selon un pattern "rectangulaire" sur la fenêtre de jeu
+  Argument max_c : int : nombre de colonnes  
+  Argument max_l : int : nombre de lignes 
+  Préconditions : max_c >= 0 ET max_l >= 0
+  Postconditions : 
+      (1) La liste de briques est de taille max_c * max_l
+      (2) Il y a max_c briques par ligne
+      (3) Il y a max_l briques par colonne
+      (4) Aucune briques ne se chevauchent
+  *)
+  let rec create_briques max_c max_l =
+    let rec aux col_actuelle ligne_actuelle l =
+      if ligne_actuelle = max_l then l
+      else if col_actuelle = max_c then aux 0 (ligne_actuelle + 1) l
+      else
+        let total_width = (float_of_int max_c) *. (InitTailleBriques.x +. espace_briques) -. espace_briques in
+        let x = (InitFenetre.supx -. InitFenetre.infx -. total_width) /. 2. +. InitFenetre.infx +. (float_of_int col_actuelle) *. (InitTailleBriques.x +. espace_briques) in
+        let y = InitFenetre.supy /. 2. +. InitFenetre.marge +. (float_of_int ligne_actuelle) *. (InitTailleBriques.y +. espace_briques) in
+        aux (col_actuelle + 1) ligne_actuelle (create_brick x y InitTailleBriques.x InitTailleBriques.y :: l)
+    in
+    aux 0 0 []
+
+  let briques = create_briques max_columns max_lignes
+
+  (*
+  let briques = [
+    create_brick 100. 500. 70. 20.;
+    create_brick 200. 500. 70. 20.;
+    create_brick 300. 500. 70. 20.;
+    create_brick 400. 500. 70. 20.;
+  ]
+  *)
+
+  let etat_init = Some (State (balle, raquette, briques))
 end 
 
 module Game (F : Frame) = 
@@ -104,8 +150,44 @@ struct
       Ball (Pair (bx,by), Pair (new_vx, new_vy))
     else Ball (Pair (bx,by), Pair (vx, vy))
 
+  (* Gestion des collisions avec les briques *)
+  let handle_collision ball brick =
+    let Ball (Pair (bx, by), Pair (vx, vy)) = ball in
+    let Brique (Pair (rx, ry), Pair (brick_width, brick_height), _) = brick in
+  
+    if is_colliding ball brick then
+      (* Déterminer si la collision est sur un bord horizontal ou vertical *)
+      let collided_from_top_or_bottom =
+        bx >= rx && bx <= rx +. brick_width &&
+        (abs_float (by -. ry) <= 5.0 || abs_float (by -. (ry +. brick_height)) <= 5.0)
+      in
+  
+      let collided_from_left_or_right =
+        by >= ry && by <= ry +. brick_height &&
+        (abs_float (bx -. rx) <= 5.0 || abs_float (bx -. (rx +. brick_width)) <= 5.0)
+      in
+  
+      (* Ajuster les directions *)
+      let new_vx = if collided_from_left_or_right then -.vx else vx in
+      let new_vy = if collided_from_top_or_bottom then -.vy else vy in
+  
+      let new_ball = Ball (Pair (bx, by), Pair (new_vx, new_vy)) in
+      (new_ball, break_brick brick)  (* Marquer la brique comme cassée *)
+    else
+      (ball, brick)
+  
+  let collisions_briques ball bricks =
+    let rec process_bricks ball bricks updated_bricks =
+      match bricks with
+      | [] -> (ball, List.rev updated_bricks)
+      | brick :: rest ->
+        let ball_after_collision, updated_brick = handle_collision ball brick in
+        process_bricks ball_after_collision rest (updated_brick :: updated_bricks)
+    in
+    process_bricks ball bricks []
+
   let update_state (mouse_x, _) state = match state with 
-    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)))) ->
+    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)), bricks)) ->
 
       (*Mise à jour de la raquette*)
       let new_raquette = update_raquette mouse_x (Raquette (Pair (rx,ry))) in
@@ -119,9 +201,9 @@ struct
       (*Mise à jour des collisions avec la raquette*)
       let ball_after_raquette = collisions_raquette ball_after_walls new_raquette in
 
+      let ball_after_briques, new_bricks = collisions_briques ball_after_raquette bricks in
 
-      Some (State (ball_after_raquette, new_raquette))
+      Some (State (ball_after_briques, new_raquette, new_bricks))
     | None -> failwith "Erreur : etat inconnu"
     | _ -> failwith "Erreur : etat inconnu"
-  
 end
