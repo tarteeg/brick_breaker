@@ -1,15 +1,13 @@
-(* ouvre la bibliotheque de modules definis dans lib/ *)
-open Libnewtonoid
-open Iterator
+(* Fichier principal *)
 
-(* exemple d'ouvertue d'un tel module de la bibliotheque : *)
+open Libnewtonoid (* bibliotheque de modules definis dans lib/ *)
+open Iterator
 open Game
 open Types
 open Debug
 
 (* Initialisation correcte *)
 let () = Graphics.open_graph " 800x600"
-
 
 (* Fonction qui intègre/somme les valeurs successives du flux *)
 (* avec un pas de temps dt et une valeur initiale nulle, i.e. *)
@@ -31,15 +29,13 @@ let integre dt flux =
   in acc;;
 
 
-
-
 module Drawing (F : Frame) = 
 struct
   let graphic_format =
     Format.sprintf
       " %dx%d+50+50"
-      (int_of_float ((2. *. Init.marge) +. Init.supx -. Init.infx))
-      (int_of_float ((2. *. Init.marge) +. Init.supy -. Init.infy))
+      (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supx -. InitFenetre.infx))
+      (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supy -. InitFenetre.infy))
 
   (* extrait le score courant d'un etat : *)
   let score etat : int = 0 
@@ -53,7 +49,7 @@ struct
           Graphics.draw_circle (int_of_float x) (int_of_float y) 5; 
 
           (* Placement de la raquette *)
-          Graphics.fill_rect (int_of_float rx) (int_of_float ry) 100 10 ;
+          Graphics.fill_rect (int_of_float rx) (int_of_float ry) (int_of_float InitTailleRaquette.x) (int_of_float InitTailleRaquette.y) ;
         end
     (* failwith "A DEFINIR" *)
 
@@ -69,7 +65,7 @@ struct
         draw_state etat;
         (* FIN DESSIN ETAT *)
         Graphics.synchronize ();
-        Unix.sleepf Init.dt;
+        Unix.sleepf InitFenetre.dt;
         
         (* Maj du flux *)
         loop (flux_etat') (last_score + score etat);
@@ -82,30 +78,15 @@ struct
     Graphics.close_graph () 
 end
 
-(* Initialisation *)
-let pos_balle = Pair (400., 300.)
-let vel_balle = Pair (300.0, -300.)
-let balle = Ball (pos_balle, vel_balle)
+(* Initialisation de la fenêtre graphique *)
 
-let pos_raquette = Pair (400., 50.)
-let raquette = Raquette pos_raquette
+module G = Game(InitFenetre)
+module D = Drawing(InitFenetre)
 
-(*
-let briques = Brick [
-  Pair (100., 500.); 
-  Pair (200., 500.); 
-  Pair (300., 500.);
-  Pair (400., 500.)
-]
-*)
-let etat0 = Some (State (balle, raquette))
-
-module G = Game(Init)
-module D = Drawing(Init)
-
+(* Boucle principale *)
 
 let _ = 
   let flux_etat =
     Flux.unfold
-     (fun state -> Some (state, G.update_state (fst (Graphics.mouse_pos ()) |> float_of_int, false) state)) etat0 in 
+     (fun state -> Some (state, G.update_state (fst (Graphics.mouse_pos ()) |> float_of_int, false) state)) InitGame.etat_init in 
   D.draw (flux_etat)

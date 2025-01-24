@@ -4,6 +4,7 @@ open Types
 
 module type Frame =
   sig
+    (* Fenêtre principale *)
     val dt : float
     val marge : float 
     val infx : float
@@ -13,13 +14,7 @@ module type Frame =
   end
 
 (* Parametres globaux d'initialisation du jeu *)
-(* dt : pas de temps                          *)
-(* marge : paire d'abscisses (xmin, xmax)     *)
-(* infx : paire d'abscisses (xmin, xmax)      *)
-(* infy : paire d'abscisses (xmin, xmax)      *)
-(* supx : paire d'abscisses (xmin, xmax)      *)
-(* supy : paire d'abscisses (xmin, xmax)      *)
-module Init : Frame = struct
+module InitFenetre : Frame = struct
   let dt = 1. /. 60. (* 60 Hz *)
   let marge = 10.
   let infx = 10.
@@ -28,6 +23,51 @@ module Init : Frame = struct
   let supy = 590.
 end
 
+(* Module définissant un couple de flottants (pour les objets balle et raquette) *)
+module type InitPair =
+sig 
+  val x : float
+  val y : float 
+end 
+
+(* Position initiale de la balle *)
+module InitPosBalle : InitPair = struct
+  let x = 400.
+  let y = 300.
+end
+
+(* Vitesse initiale de la balle *)
+module InitVelocityBalle : InitPair = struct
+  let x = 300.
+  let y = -300.
+end
+
+(* Position initiale de la raquette *)
+module InitPosRaquette : InitPair = struct
+  let x = 400.
+  let y = 50.
+end
+
+(* Taile initiale de la raquette *)
+module InitTailleRaquette : InitPair = struct
+  let x = 100. (* Largeur *)
+  let y = 10. (* Hauteur *)
+end
+
+(* Initialisation de la partie *)
+module InitGame = struct
+
+  (* Initialisation de la balle *)
+  let pos_balle = Pair (InitPosBalle.x, InitPosBalle.y)
+  let vel_balle = Pair (InitVelocityBalle.x, InitVelocityBalle.y)
+  let balle = Ball (pos_balle, vel_balle)
+  
+  (* Initialisation de la raquette *)
+  let pos_raquette = Pair (InitPosRaquette.x, InitPosRaquette.y)
+  let raquette = Raquette pos_raquette
+
+  let etat_init = Some (State (balle, raquette))
+end 
 
 module Game (F : Frame) = 
 struct
@@ -49,9 +89,9 @@ struct
 
   let collisions_murs (Ball (Pair (bx,by), Pair (dx,dy))) = 
     let new_dx = 
-      if bx < Init.infx || bx > Init.supx then -.dx else dx in
+      if bx < InitFenetre.infx || bx > InitFenetre.supx then -.dx else dx in
     let new_dy = 
-      if by < Init.infy || by > Init.supy then -.dy else dy in
+      if by < InitFenetre.infy || by > InitFenetre.supy then -.dy else dy in
     Ball (Pair (bx,by), Pair (new_dx, new_dy))
   
   let collisions_raquette (Ball (Pair (bx,by), Pair (vx,vy))) (Raquette (Pair (rx,ry))) = 
