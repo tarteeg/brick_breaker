@@ -12,7 +12,7 @@ open Types
 
   let print_state state = match state with
     | None -> print_endline "Rien dans l'etat"
-    | Some State (Ball (Pair (x, y), Pair (dx, dy)), Raquette raquette) ->
+    | Some State (Ball (Pair (x, y), Pair (dx, dy)), Raquette raquette, bricks) ->
         print_ball (Some (Ball (Pair (x, y), Pair (dx, dy))));
         print_raquette (Some (Raquette raquette));
         print_endline "\n"

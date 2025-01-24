@@ -66,7 +66,15 @@ module InitGame = struct
   let pos_raquette = Pair (InitPosRaquette.x, InitPosRaquette.y)
   let raquette = Raquette pos_raquette
 
-  let etat_init = Some (State (balle, raquette))
+  (* Initialisation des briques *)
+  let briques = [
+    create_brick 100. 500. 70. 20.;
+    create_brick 200. 500. 70. 20.;
+    create_brick 300. 500. 70. 20.;
+    create_brick 400. 500. 70. 20.;
+  ]
+
+  let etat_init = Some (State (balle, raquette, briques))
 end 
 
 module Game (F : Frame) = 
@@ -104,8 +112,46 @@ struct
       Ball (Pair (bx,by), Pair (new_vx, new_vy))
     else Ball (Pair (bx,by), Pair (vx, vy))
 
+  (* Gestion des collisions avec les briques *)
+  let handle_collision ball brick =
+    let Ball (Pair (bx, by), Pair (vx, vy)) = ball in
+    let Pair (rx, ry) = brick.position in
+    let brick_width = brick.width in
+    let brick_height = brick.height in
+  
+    if is_colliding ball brick then
+      (* Déterminer si la collision est sur un bord horizontal ou vertical *)
+      let collided_from_top_or_bottom =
+        bx >= rx && bx <= rx +. brick_width &&
+        (abs_float (by -. ry) <= 5.0 || abs_float (by -. (ry +. brick_height)) <= 5.0)
+      in
+  
+      let collided_from_left_or_right =
+        by >= ry && by <= ry +. brick_height &&
+        (abs_float (bx -. rx) <= 5.0 || abs_float (bx -. (rx +. brick_width)) <= 5.0)
+      in
+  
+      (* Ajuster les directions *)
+      let new_vx = if collided_from_left_or_right then -.vx else vx in
+      let new_vy = if collided_from_top_or_bottom then -.vy else vy in
+  
+      let new_ball = Ball (Pair (bx, by), Pair (new_vx, new_vy)) in
+      (new_ball, break_brick brick)  (* Marquer la brique comme cassée *)
+    else
+      (ball, brick)
+  
+  let collisions_briques ball bricks =
+    let rec process_bricks ball bricks updated_bricks =
+      match bricks with
+      | [] -> (ball, List.rev updated_bricks)
+      | brick :: rest ->
+        let ball_after_collision, updated_brick = handle_collision ball brick in
+        process_bricks ball_after_collision rest (updated_brick :: updated_bricks)
+    in
+    process_bricks ball bricks []
+
   let update_state (mouse_x, _) state = match state with 
-    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)))) ->
+    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)), bricks)) ->
 
       (*Mise à jour de la raquette*)
       let new_raquette = update_raquette mouse_x (Raquette (Pair (rx,ry))) in
@@ -119,9 +165,9 @@ struct
       (*Mise à jour des collisions avec la raquette*)
       let ball_after_raquette = collisions_raquette ball_after_walls new_raquette in
 
+      let ball_after_briques, new_bricks = collisions_briques ball_after_raquette bricks in
 
-      Some (State (ball_after_raquette, new_raquette))
+      Some (State (ball_after_briques, new_raquette, new_bricks))
     | None -> failwith "Erreur : etat inconnu"
     | _ -> failwith "Erreur : etat inconnu"
-  
 end

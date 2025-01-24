@@ -43,15 +43,24 @@ struct
   let draw_state etat =
     match etat with 
       | None -> failwith "Erreur"
-      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)))) -> 
+      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), bricks)) -> 
         begin
           (* Placement de la balle *)
           Graphics.draw_circle (int_of_float x) (int_of_float y) 5; 
 
           (* Placement de la raquette *)
-          Graphics.fill_rect (int_of_float rx) (int_of_float ry) (int_of_float InitTailleRaquette.x) (int_of_float InitTailleRaquette.y) ;
+          Graphics.fill_rect (int_of_float rx) (int_of_float ry) 100 10 ;
+
+          let draw_brick brick =
+            if not brick.is_broken then
+              let Pair (x, y) = brick.position in
+              Graphics.fill_rect (int_of_float x) (int_of_float y) (int_of_float brick.width) (int_of_float brick.height)
+          in
+          let draw_bricks bricks =
+            List.iter draw_brick bricks
+          in
+          draw_bricks bricks;
         end
-    (* failwith "A DEFINIR" *)
 
   let draw flux_etat =
     let rec loop flux_etat last_score =
