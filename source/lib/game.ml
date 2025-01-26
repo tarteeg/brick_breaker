@@ -1,6 +1,7 @@
 open Iterator
 open Input
 open Types
+open Quadtree
 
 module type Frame =
   sig
@@ -63,7 +64,7 @@ end
 
 (* Constantes sur les briques *)
 module ConstantesBriques = struct 
-  let espace_briques = 10. 
+  let espace_briques = 2. 
   let max_c = int_of_float ((InitFenetre.supx -. InitFenetre.infx -. InitFenetre.marge) /. (InitTailleBriques.x +. espace_briques))
   let max_l = int_of_float ((InitFenetre.supy /. 2. -. InitFenetre.infy -. InitFenetre.marge) /. (InitTailleBriques.y +. espace_briques))
   let nb_briques = max_l * max_c
@@ -109,9 +110,11 @@ module InitGame = struct
     in
     aux 0 0 []
 
-  let briques = create_briques 
+  let briques = create_briques
 
-  let etat_init = Some (State (balle, raquette, briques, false, nb_balles))
+  let quadtree = List.fold_left (fun acc brique -> insert brique acc) (create_quadtree InitFenetre.infx InitFenetre.infy (InitFenetre.supx -. InitFenetre.infx) (InitFenetre.supy -. InitFenetre.infy)) briques
+
+  let etat_init = Some (State (balle, raquette, quadtree, false, nb_balles))
 end 
 
 (* --------------------------------------------------------- *)
@@ -206,49 +209,39 @@ struct
   let handle_collision ball brick =
     let Ball (Pair (bx, by), Pair (vx, vy)) = ball in
     let Brique (Pair (rx, ry), Pair (brick_width, brick_height), _) = brick in
-  
+
     if is_colliding ball brick then
       (* Déterminer si la collision est sur un bord horizontal ou vertical *)
       let collided_from_top_or_bottom =
         bx >= rx && bx <= rx +. brick_width &&
         (abs_float (by -. ry) <= 5.0 || abs_float (by -. (ry +. brick_height)) <= 5.0)
       in
-  
+
       let collided_from_left_or_right =
         by >= ry && by <= ry +. brick_height &&
         (abs_float (bx -. rx) <= 5.0 || abs_float (bx -. (rx +. brick_width)) <= 5.0)
       in
-  
+
       (* Ajuster les directions *)
       let new_vx = if collided_from_left_or_right then -.vx else vx in
       let new_vy = if collided_from_top_or_bottom then -.vy else vy in
-  
+
       let new_ball = Ball (Pair (bx, by), Pair (new_vx, new_vy)) in
       (new_ball, break_brick brick)  (* Marquer la brique comme cassée *)
     else
       (ball, brick)
   
-  let collisions_briques ball bricks =
-    let rec process_bricks ball bricks updated_bricks =
-      match bricks with
-      | [] -> (ball, List.rev updated_bricks)
-      | brick :: rest ->
-        let ball_after_collision, updated_brick = handle_collision ball brick in
-        process_bricks ball_after_collision rest (updated_brick :: updated_bricks)
-    in
-    process_bricks ball bricks []
-
   let lose ball = match ball with
     | Ball (Pair (_, by), _) -> by <= F.infy
 
   let rec update_state (mouse_x, mouse_pressed) state = match state with 
-    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)), bricks, partie_en_cours, nb_balles)) ->
+    | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)), quadtree, partie_en_cours, nb_balles)) ->
       if not partie_en_cours then
         let new_raquette = update_raquette mouse_x (Raquette (Pair (rx,ry))) in
         if mouse_pressed then 
-          (Some (State (InitGame.balle, new_raquette, bricks, true, nb_balles)))
+          (Some (State (InitGame.balle, new_raquette, quadtree, true, nb_balles)))
         else 
-          Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), new_raquette, bricks, false, nb_balles))
+          Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), new_raquette, quadtree, false, nb_balles))
       else
         (*Mise à jour de la balle*)
         let new_ball = update_ball (Ball (Pair (bx,by), Pair (dx,dy))) in
@@ -260,9 +253,9 @@ struct
 
           (* Vérification de fin de partie (plus de balles) *)
           if nb_balles = 1 then 
-            Some (State (InitGame.balle, InitGame.raquette, InitGame.briques, false, InitGame.nb_balles))      
+            Some (State (InitGame.balle, InitGame.raquette, InitGame.quadtree, false, InitGame.nb_balles))      
           else  
-            Some (State (InitGame.balle, new_raquette, bricks, false, nb_balles - 1))
+            Some (State (InitGame.balle, new_raquette, quadtree, false, nb_balles - 1))
         else 
           (*Mise à jour de la raquette*)
           let new_raquette = update_raquette mouse_x (Raquette (Pair (rx,ry))) in
@@ -273,9 +266,29 @@ struct
           (*Mise à jour des collisions avec la raquette*)
           let ball_after_raquette = collisions_raquette ball_after_walls new_raquette in
 
-          let ball_after_briques, new_bricks = collisions_briques ball_after_raquette bricks in
+          (* Extraire la position de la balle (bx, by) *)
+          let Ball (Pair (bx, by), _) = ball_after_raquette in
 
-          Some (State (ball_after_briques, new_raquette, new_bricks, true, nb_balles))
+          (* Query pour récupérer les briques proches de la balle *)
+          let radius = 50.0 in  (* rayon de recherche autour de la balle *)
+          let briques_proches = query quadtree (Pair (bx, by)) radius in
+
+
+          (* On met à jour les briques proches de la balle et on teste les collisions *)
+          let rec update_briques_and_ball ball bricks updated_briques =
+            match bricks with
+            | [] -> ball, updated_briques
+            | b :: bs ->
+              let ball, updated_brique = handle_collision ball b in
+              update_briques_and_ball ball bs (updated_brique :: updated_briques)
+          in
+
+          let ball_after_briques, updated_briques = update_briques_and_ball ball_after_raquette briques_proches [] in
+
+          (* Mise à jour du quadtree avec les briques mises à jour *)
+          let updated_quadtree = update_quadtree quadtree updated_briques in
+
+          Some (State (ball_after_briques, new_raquette, updated_quadtree, true, nb_balles))
     | None -> failwith "Erreur : etat inconnu"
     | _ -> failwith "Erreur : etat inconnu"
 end

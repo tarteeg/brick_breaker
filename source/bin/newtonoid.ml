@@ -5,6 +5,7 @@ open Iterator
 open Game
 open Types
 open Debug
+open Quadtree
 
 (* Initialisation correcte *)
 let () = Graphics.open_graph (Printf.sprintf " %dx%d"
@@ -33,13 +34,13 @@ let integre dt flux =
 (* extrait le score courant d'un etat : 
 Score = nombre de briques cassées *)
 let score etat = match etat with 
-    |Some (State (_, _, bricks, _, _)) -> 
+    |Some (State (_, _, quadtree, _, _)) -> 
     let rec aux l = match l with 
       |[] -> 0
       |(Brique (_,_,est_cassee))::q -> 
         if est_cassee then 1 + aux q 
         else aux q 
-      in aux bricks
+      in aux (retrieve_all quadtree)
     |None -> failwith "Erreur : etat inconnu"
 
 module Drawing (F : Frame) = 
@@ -68,7 +69,7 @@ struct
     draw_score score_actuel ; (
     match etat with 
       | None -> failwith "Erreur"
-      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), bricks, partie_en_cours,nb_balles)) -> 
+      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), quadtree, partie_en_cours,nb_balles)) -> 
         begin
           (* Affichage du nombre de balles *)
           draw_nb_balles_restantes nb_balles;
@@ -79,15 +80,18 @@ struct
           (* Placement de la raquette *)
           Graphics.fill_rect (int_of_float rx) (int_of_float ry) 100 10 ;
 
+          (* Fonction pour dessiner une brique *)
           let draw_brick brick =
             let Brique (Pair (x, y), Pair (width, height), is_broken) = brick in
             if not is_broken then
               Graphics.fill_rect (int_of_float x) (int_of_float y) (int_of_float width) (int_of_float height)
           in
-          let draw_bricks bricks =
-            List.iter draw_brick bricks
-          in
-          draw_bricks bricks;
+
+          (* Récupération de toutes les briques depuis le quadtree *)
+          let bricks = retrieve_all quadtree in
+
+          (* Dessin des briques *)
+          List.iter draw_brick bricks;
         end
     )
 
