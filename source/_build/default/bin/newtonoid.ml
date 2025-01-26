@@ -7,7 +7,9 @@ open Types
 open Debug
 
 (* Initialisation correcte *)
-let () = Graphics.open_graph " 800x600"
+let () = Graphics.open_graph (Printf.sprintf " %dx%d"
+  (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supx -. InitFenetre.infx))
+  (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supy -. InitFenetre.infy)))
 
 (* Fonction qui intègre/somme les valeurs successives du flux *)
 (* avec un pas de temps dt et une valeur initiale nulle, i.e. *)
@@ -28,6 +30,17 @@ let integre dt flux =
     Tick (lazy (Some (init, Flux.map2 iter acc flux)))
   in acc;;
 
+(* extrait le score courant d'un etat : 
+Score = nombre de briques cassées *)
+let score etat = match etat with 
+    |Some (State (_, _, bricks, _, _)) -> 
+    let rec aux l = match l with 
+      |[] -> 0
+      |(Brique (_,_,est_cassee))::q -> 
+        if est_cassee then 1 + aux q 
+        else aux q 
+      in aux bricks
+    |None -> failwith "Erreur : etat inconnu"
 
 module Drawing (F : Frame) = 
 struct
@@ -37,14 +50,29 @@ struct
       (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supx -. InitFenetre.infx))
       (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supy -. InitFenetre.infy))
 
-  (* extrait le score courant d'un etat : *)
-  let score etat : int = 0 
-  
+  let draw_fin_de_partie () =
+    Graphics.moveto (int_of_float (InitFenetre.infx +. 200.)) (int_of_float (InitFenetre.supy -. InitFenetre.marge -. 20.));
+    Graphics.draw_string "Partie Terminee"
+
+  let draw_nb_balles_restantes nb = 
+    Graphics.moveto (int_of_float (InitFenetre.infx +. 100.)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
+    Graphics.draw_string (Printf.sprintf "Balles : %d" nb)
+
+  let draw_score s = 
+    Graphics.moveto (int_of_float (InitFenetre.infx)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
+    Graphics.draw_string (Printf.sprintf "Score : %d" s)
+
   let draw_state etat =
+    (* Affichage du score *)
+    let score_actuel = score etat in 
+    draw_score score_actuel ; (
     match etat with 
       | None -> failwith "Erreur"
-      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), bricks)) -> 
+      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), bricks, partie_en_cours,nb_balles)) -> 
         begin
+          (* Affichage du nombre de balles *)
+          draw_nb_balles_restantes nb_balles;
+
           (* Placement de la balle *)
           Graphics.draw_circle (int_of_float x) (int_of_float y) 5; 
 
@@ -61,6 +89,7 @@ struct
           in
           draw_bricks bricks;
         end
+    )
 
   let draw flux_etat =
     let rec loop flux_etat last_score =
@@ -83,7 +112,7 @@ struct
     (*Graphics.open_graph graphic_format;*)
     Graphics.auto_synchronize false;
     let score = loop flux_etat 0 in
-    (* Format.printf "Score final : %d@\n" score; *)
+    Format.printf "Score final : %d@\n" score;
     Graphics.close_graph () 
 end
 
@@ -92,10 +121,12 @@ end
 module G = Game(InitFenetre)
 module D = Drawing(InitFenetre)
 
-(* Boucle principale *)
-
 let _ = 
   let flux_etat =
     Flux.unfold
-     (fun state -> Some (state, G.update_state (fst (Graphics.mouse_pos ()) |> float_of_int, false) state)) InitGame.etat_init in 
+      (fun state -> 
+        let mouse_x = fst (Graphics.mouse_pos ()) |> float_of_int in
+        let mouse_pressed = Graphics.button_down () in
+        Some (state, G.update_state (mouse_x, mouse_pressed) state))
+      InitGame.etat_init in 
   D.draw (flux_etat)
