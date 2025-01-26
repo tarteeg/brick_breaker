@@ -4,7 +4,7 @@ let create_quadtree x y width height = Leaf ([], Pair (x, y), Pair (width, heigh
 
 let rec retrieve_all quadtree =
   match quadtree with
-  | Leaf (objects, _, _) -> objects
+  | Leaf (briques, _, _) -> briques
   | Node (nw, ne, sw, se, _, _) ->
       retrieve_all nw @ retrieve_all ne @ retrieve_all sw @ retrieve_all se
 
@@ -40,7 +40,7 @@ let rec insert brick qt =
 
 let rec query qt (Pair (bx, by)) radius =
   match qt with
-  | Leaf (bricks, Pair (x, y), Pair (width, height)) ->
+  | Leaf (bricks, _, _) ->
     List.filter (fun brick ->
       let Brique (Pair (rx, ry), Pair (rw, rh), _) = brick in
       bx +. radius >= rx && bx -. radius <= rx +. rw &&
@@ -53,12 +53,11 @@ let rec query qt (Pair (bx, by)) radius =
     let in_ne = bx +. radius >= x +. half_width && by -. radius < y +. half_height in
     let in_sw = bx -. radius < x +. half_width && by +. radius >= y +. half_height in
     let in_se = bx +. radius >= x +. half_width && by +. radius >= y +. half_height in
-    let bricks = ref [] in
-    if in_nw then bricks := !bricks @ query nw (Pair (bx, by)) radius;
-    if in_ne then bricks := !bricks @ query ne (Pair (bx, by)) radius;
-    if in_sw then bricks := !bricks @ query sw (Pair (bx, by)) radius;
-    if in_se then bricks := !bricks @ query se (Pair (bx, by)) radius;
-    !bricks
+    let bricks_nw = if in_nw then query nw (Pair (bx, by)) radius else [] in
+    let bricks_ne = if in_ne then query ne (Pair (bx, by)) radius else [] in
+    let bricks_sw = if in_sw then query sw (Pair (bx, by)) radius else [] in
+    let bricks_se = if in_se then query se (Pair (bx, by)) radius else [] in
+    bricks_nw @ bricks_ne @ bricks_sw @ bricks_se
 
 let rec update_quadtree qt updated_briques =
   match qt with
@@ -78,3 +77,37 @@ let rec update_quadtree qt updated_briques =
       Pair (x, y),
       Pair (width, height)
     )
+
+(* Tests unitaires *)
+let%test "test_create_quadtree" =
+  let qt = create_quadtree 0.0 0.0 100.0 100.0 in
+  match qt with
+  | Leaf (_, Pair (x, y), Pair (width, height)) ->
+    x = 0.0 && y = 0.0 && width = 100.0 && height = 100.0
+  | _ -> false
+
+let%test "test_insert" =
+  let qt = create_quadtree 0.0 0.0 100.0 100.0 in
+  let brick = Brique (Pair (10.0, 10.0), Pair (20.0, 10.0), false) in
+  let qt = insert brick qt in
+  match qt with
+  | Leaf (bricks, _, _) -> List.length bricks = 1
+  | _ -> false
+
+let%test "test_retrieve_all" =
+  let qt = create_quadtree 0.0 0.0 100.0 100.0 in
+  let brick1 = Brique (Pair (10.0, 10.0), Pair (20.0, 10.0), false) in
+  let brick2 = Brique (Pair (30.0, 30.0), Pair (20.0, 10.0), false) in
+  let qt = insert brick1 qt in
+  let qt = insert brick2 qt in
+  let bricks = retrieve_all qt in
+  List.length bricks = 2
+
+let%test "test_query" =
+  let qt = create_quadtree 0.0 0.0 100.0 100.0 in
+  let brick1 = Brique (Pair (10.0, 10.0), Pair (20.0, 10.0), false) in
+  let brick2 = Brique (Pair (30.0, 30.0), Pair (20.0, 10.0), false) in
+  let qt = insert brick1 qt in
+  let qt = insert brick2 qt in
+  let result = query qt (Pair (15.0, 15.0)) 5.0 in
+  List.length result = 1 && List.hd result = brick1

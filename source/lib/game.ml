@@ -1,5 +1,3 @@
-open Iterator
-open Input
 open Types
 open Quadtree
 
@@ -96,7 +94,7 @@ module InitGame = struct
       (3) Il y a max_l briques par colonne
       (4) Aucune briques ne se chevauchent
   *)
-  let rec create_briques =
+  let create_briques =
     let create_brick x y width height = Brique (Pair (x, y), Pair (width, height), false) in
     let rec aux col_actuelle ligne_actuelle l =
       if ligne_actuelle = ConstantesBriques.max_l
@@ -151,20 +149,28 @@ end
 
 module Game (F : Frame) = 
 struct
-  (*update ball*)
+  (** [update_ball ball] met à jour la position de la balle en fonction de sa vitesse et du temps écoulé.
+      @param ball La balle à mettre à jour.
+      @return La balle mise à jour avec sa nouvelle position. *)
   let update_ball ball = match ball with 
   |Ball (Pair (bx,by), Pair (vx,vy)) -> 
 
     Ball (Pair (bx+.vx*.F.dt, by+.vy*.F.dt), Pair (vx,vy))
-  |_ -> failwith "Erreur : ball inconnue"
+  | _ -> failwith "Erreur : balle inconnue"
 
-  (*update raquette*)
+  (** [update_raquette mouse_x raquette] met à jour la position de la raquette en fonction de la position de la souris.
+      @param mouse_x La position x de la souris.
+      @param raquette La raquette à mettre à jour.
+      @return La raquette mise à jour avec sa nouvelle position. *)
   let update_raquette mouse_x raquette = match raquette with 
-  | Raquette (Pair (rx, ry)) -> 
+  | Raquette (Pair (_, ry)) -> 
     let new_rx = max F.infx (min (F.supx -. InitTailleRaquette.x) (mouse_x -. InitTailleRaquette.x /. 2.)) in
     Raquette (Pair (new_rx, ry))
   | _ -> failwith "Erreur : raquette inconnue"
-
+  
+  (** [collisions_murs ball] gère les collisions de la balle avec les murs.
+      @param ball La balle à vérifier.
+      @return La balle mise à jour après la collision avec les murs. *)
   let collisions_murs (Ball (Pair (bx,by), Pair (dx,dy))) = 
     if by < F.infy then
       Ball (Pair (InitPosBalle.x, InitPosBalle.y), Pair (InitVelocityBalle.x, InitVelocityBalle.y))
@@ -175,6 +181,10 @@ struct
         if by > F.supy then -.dy else dy in
       Ball (Pair (bx,by), Pair (new_dx, new_dy))
 
+  (** [collisions_raquette ball raquette] gère les collisions de la balle avec la raquette.
+      @param ball La balle à vérifier.
+      @param raquette La raquette à vérifier.
+      @return La balle mise à jour après la collision avec la raquette. *)
   let collisions_raquette (Ball (Pair (bx,by), Pair (vx,vy))) (Raquette (Pair (rx,ry))) = 
     if by >= ry && by <= ry +. 10. && bx >= rx && bx <= rx +. 100. then
       let relative_x = (bx -. rx) /. 100. in  (* Position relative sur la raquette *)
@@ -185,7 +195,10 @@ struct
       Ball (Pair (bx,by), Pair (new_vx, new_vy))
     else Ball (Pair (bx,by), Pair (vx, vy))
 
-  (* Vérifie si une balle entre en collision avec une brique *)
+  (** [is_colliding ball brick] vérifie si une balle entre en collision avec une brique.
+      @param ball La balle à vérifier.
+      @param brick La brique à vérifier.
+      @return true si la balle entre en collision avec la brique, false sinon. *)
   let is_colliding (Ball (Pair (bx, by), _)) brick = match brick with
     | Brique (Pair (x, y), Pair (w, h), is_broken) ->
       let ball_radius = 5.0 in (* Rayon de la balle *)
@@ -200,12 +213,18 @@ struct
 
       (* Collision si la distance est inférieure ou égale au rayon *)
       (distance_x ** 2. +. distance_y ** 2.) <= ball_radius ** 2. && not is_broken
-
+  
+  (** [break_brick brique] marque une brique comme cassée.
+      @param brique La brique à marquer comme cassée.
+      @return La brique mise à jour avec l'état cassé. *)
   let break_brick brique = match brique with 
     | Brique (Pair (x, y), Pair (w, h), _) -> Brique (Pair (x, y), Pair (w, h), true)
     | _ -> failwith "Erreur : brique inconnue"
     
-  (* Gestion des collisions avec les briques *)
+  (** [handle_collision ball brick] gère les collisions de la balle avec une brique.
+      @param ball La balle à vérifier.
+      @param brick La brique à vérifier.
+      @return Un couple contenant la balle mise à jour et la brique mise à jour après la collision. *)
   let handle_collision ball brick =
     let Ball (Pair (bx, by), Pair (vx, vy)) = ball in
     let Brique (Pair (rx, ry), Pair (brick_width, brick_height), _) = brick in
@@ -233,8 +252,13 @@ struct
   
   let lose ball = match ball with
     | Ball (Pair (_, by), _) -> by <= F.infy
-
-  let rec update_state (mouse_x, mouse_pressed) state = match state with 
+  
+  (** [update_state ball (mouse_x, mouse_pressed) state] met à jour l'état du jeu.
+      @param mouse_x position horizontale de la souris.
+      @param mouse_pressed état du bouton de la souris.
+      @param state état actuel du jeu.
+      @return Le nouvel état du jeu *)
+  let update_state (mouse_x, mouse_pressed) state = match state with 
     | Some (State ((Ball ((Pair (bx,by)), (Pair (dx,dy)))), Raquette (Pair (rx,ry)), quadtree, partie_en_cours, nb_balles)) ->
       if not partie_en_cours then
         let new_raquette = update_raquette mouse_x (Raquette (Pair (rx,ry))) in
@@ -289,8 +313,46 @@ struct
           let updated_quadtree = update_quadtree quadtree updated_briques in
 
           Some (State (ball_after_briques, new_raquette, updated_quadtree, true, nb_balles))
-    | None -> failwith "Erreur : etat inconnu"
     | _ -> failwith "Erreur : etat inconnu"
+    | None -> failwith "Erreur : etat inconnu"
+  
+  (* Tests unitaires *)
+  let%test "test_update_ball" =
+    let ball = Ball (Pair (0.0, 0.0), Pair (1.0, 1.0)) in
+    let updated_ball = update_ball ball in
+    match updated_ball with
+    | Ball (Pair (bx, by), Pair (vx, vy)) ->
+      bx = 1.0 && by = 1.0 && vx = 1.0 && vy = 1.0
+    | _ -> false
+
+  let%test "test_update_raquette" =
+    let raquette = Raquette (Pair (50.0, 10.0)) in
+    let updated_raquette = update_raquette 100.0 raquette in
+    match updated_raquette with
+    | Raquette (Pair (rx, _)) -> rx = 75.0
+    | _ -> false
+  
+  let%test "test_collisions_murs" =
+    let ball = Ball (Pair (10.0, 10.0), Pair (1.0, -1.0)) in
+    let updated_ball = collisions_murs ball in
+    match updated_ball with
+    | Ball (Pair (bx, by), Pair (vx, vy)) ->
+      bx = 10.0 && by = 10.0 && vx = 1.0 && vy = -1.0
+    | _ -> false
+
+  let%test "test_collisions_raquette" =
+    let ball = Ball (Pair (50.0, 50.0), Pair (1.0, -1.0)) in
+    let raquette = Raquette (Pair (40.0, 50.0)) in
+    let updated_ball = collisions_raquette ball raquette in
+    match updated_ball with
+    | Ball (Pair (bx, by), Pair (vx, vy)) ->
+      bx = 50.0 && by = 50.0 && vx <> 1.0 && vy > 0.0
+    | _ -> false
+
+  let%test "test_is_colliding" =
+    let ball = Ball (Pair (50.0, 50.0), Pair (1.0, -1.0)) in
+    let brick = Brique (Pair (45.0, 45.0), Pair (10.0, 10.0), false) in
+    is_colliding ball brick
 end
 
 
