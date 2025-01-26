@@ -27,25 +27,27 @@ let score etat = match etat with
 
 module Drawing (F : Frame) = 
 struct
-  (*
-  let graphic_format =
-    Format.sprintf
-      " %dx%d+50+50"
-      (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supx -. InitFenetre.infx))
-      (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supy -. InitFenetre.infy))
-  
+  (* [Fonction inutilisée]
   let draw_fin_de_partie () =
     Graphics.moveto (int_of_float (InitFenetre.infx +. 200.)) (int_of_float (InitFenetre.supy -. InitFenetre.marge -. 20.));
-    Graphics.draw_string "Partie Terminee"
-  *)
+    Graphics.draw_string "Partie Terminee" *)
 
+  (* Affiche le nombre de balles restantes 
+  Signature : val draw_nb_balles_restantes : int -> unit
+  Argument : nb = nombre de balles restantes *)
   let draw_nb_balles_restantes nb = 
     Graphics.moveto (int_of_float (InitFenetre.infx +. 100.)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
     Graphics.draw_string (Printf.sprintf "Balles : %d" nb)
 
+  (* Affiche le score 
+  Argument : s = score actuel
+  Précondition : s >= 0 *)
   let draw_score s = 
-    Graphics.moveto (int_of_float (InitFenetre.infx)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
-    Graphics.draw_string (Printf.sprintf "Score : %d" s)
+    if s >= 0 then 
+      (Graphics.moveto (int_of_float (InitFenetre.infx)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
+      Graphics.draw_string (Printf.sprintf "Score : %d" s))
+    else  
+      failwith "Erreur : score négatif"
 
   let draw_state etat =
     (* Affichage du score *)
@@ -96,7 +98,6 @@ struct
         (* Maj du flux *)
         loop (flux_etat') (last_score + score etat);
     in
-    (*Graphics.open_graph graphic_format;*)
     Graphics.auto_synchronize false;
     let score = loop flux_etat 0 in
     Format.printf "Score final : %d@\n" score;
@@ -108,6 +109,7 @@ end
 module G = Game(InitFenetre)
 module D = Drawing(InitFenetre)
 
+(* --- Lancement du jeu --- *)
 let _ = 
   let flux_etat =
     Flux.unfold

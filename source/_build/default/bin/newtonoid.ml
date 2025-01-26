@@ -4,63 +4,50 @@ open Libnewtonoid (* bibliotheque de modules definis dans lib/ *)
 open Iterator
 open Game
 open Types
-open Debug
+(*open Debug*)
+open Quadtree
 
 (* Initialisation correcte *)
 let () = Graphics.open_graph (Printf.sprintf " %dx%d"
   (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supx -. InitFenetre.infx))
   (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supy -. InitFenetre.infy)))
 
-(* Fonction qui intègre/somme les valeurs successives du flux *)
-(* avec un pas de temps dt et une valeur initiale nulle, i.e. *)
-(* acc_0 = 0; acc_{i+1} = acc_{i} + dt * flux_{i}             *)
-(* paramètres:                                                *)
-(* dt : float                                                 *)
-(* flux : (float * float) Flux.t                              *)
-let integre dt flux =
-  (* valeur initiale de l'intégrateur                         *)
-  let init = Pair ( 0., 0.) in
-  (* fonction auxiliaire de calcul de acc_{i} + dt * flux_{i}
-  
-  *)
-  let iter (Pair (acc1, acc2)) (Pair (flux1, flux2)) =
-    Pair (acc1 +. dt *. flux1, acc2 +. dt *. flux2) in
-  (* définition récursive du flux acc                         *)
-  let rec acc =
-    Tick (lazy (Some (init, Flux.map2 iter acc flux)))
-  in acc;;
 
 (* extrait le score courant d'un etat : 
 Score = nombre de briques cassées *)
 let score etat = match etat with 
-    |Some (State (_, _, bricks, _, _)) -> 
+    |Some (State (_, _, quadtree, _, _)) -> 
     let rec aux l = match l with 
       |[] -> 0
       |(Brique (_,_,est_cassee))::q -> 
         if est_cassee then 1 + aux q 
         else aux q 
-      in aux bricks
+      in aux (retrieve_all quadtree)
     |None -> failwith "Erreur : etat inconnu"
 
 module Drawing (F : Frame) = 
 struct
-  let graphic_format =
-    Format.sprintf
-      " %dx%d+50+50"
-      (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supx -. InitFenetre.infx))
-      (int_of_float ((2. *. InitFenetre.marge) +. InitFenetre.supy -. InitFenetre.infy))
-
+  (* [Fonction inutilisée]
   let draw_fin_de_partie () =
     Graphics.moveto (int_of_float (InitFenetre.infx +. 200.)) (int_of_float (InitFenetre.supy -. InitFenetre.marge -. 20.));
-    Graphics.draw_string "Partie Terminee"
+    Graphics.draw_string "Partie Terminee" *)
 
+  (* Affiche le nombre de balles restantes 
+  Signature : val draw_nb_balles_restantes : int -> unit
+  Argument : nb = nombre de balles restantes *)
   let draw_nb_balles_restantes nb = 
     Graphics.moveto (int_of_float (InitFenetre.infx +. 100.)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
     Graphics.draw_string (Printf.sprintf "Balles : %d" nb)
 
+  (* Affiche le score 
+  Argument : s = score actuel
+  Précondition : s >= 0 *)
   let draw_score s = 
-    Graphics.moveto (int_of_float (InitFenetre.infx)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
-    Graphics.draw_string (Printf.sprintf "Score : %d" s)
+    if s >= 0 then 
+      (Graphics.moveto (int_of_float (InitFenetre.infx)) (int_of_float (InitFenetre.supy -. InitFenetre.marge));
+      Graphics.draw_string (Printf.sprintf "Score : %d" s))
+    else  
+      failwith "Erreur : score négatif"
 
   let draw_state etat =
     (* Affichage du score *)
@@ -68,7 +55,7 @@ struct
     draw_score score_actuel ; (
     match etat with 
       | None -> failwith "Erreur"
-      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), bricks, partie_en_cours,nb_balles)) -> 
+      | Some (State (Ball (Pair (x, y), Pair (_,_)), Raquette (Pair (rx,ry)), quadtree, _,nb_balles)) -> 
         begin
           (* Affichage du nombre de balles *)
           draw_nb_balles_restantes nb_balles;
@@ -79,15 +66,18 @@ struct
           (* Placement de la raquette *)
           Graphics.fill_rect (int_of_float rx) (int_of_float ry) 100 10 ;
 
+          (* Fonction pour dessiner une brique *)
           let draw_brick brick =
             let Brique (Pair (x, y), Pair (width, height), is_broken) = brick in
             if not is_broken then
               Graphics.fill_rect (int_of_float x) (int_of_float y) (int_of_float width) (int_of_float height)
           in
-          let draw_bricks bricks =
-            List.iter draw_brick bricks
-          in
-          draw_bricks bricks;
+
+          (* Récupération de toutes les briques depuis le quadtree *)
+          let bricks = retrieve_all quadtree in
+
+          (* Dessin des briques *)
+          List.iter draw_brick bricks;
         end
     )
 
@@ -107,9 +97,7 @@ struct
 
         (* Maj du flux *)
         loop (flux_etat') (last_score + score etat);
-      | _ -> assert false
     in
-    (*Graphics.open_graph graphic_format;*)
     Graphics.auto_synchronize false;
     let score = loop flux_etat 0 in
     Format.printf "Score final : %d@\n" score;
@@ -121,6 +109,7 @@ end
 module G = Game(InitFenetre)
 module D = Drawing(InitFenetre)
 
+(* --- Lancement du jeu --- *)
 let _ = 
   let flux_etat =
     Flux.unfold

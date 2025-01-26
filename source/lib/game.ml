@@ -85,8 +85,6 @@ module InitGame = struct
 
   (* CONTRAT
   Fonction qui crée les briques selon un pattern "rectangulaire" sur la fenêtre de jeu
-  Argument max_c : int : nombre de colonnes  
-  Argument max_l : int : nombre de lignes 
   Préconditions : max_c >= 0 ET max_l >= 0
   Postconditions : 
       (1) La liste de briques est de taille max_c * max_l
@@ -97,8 +95,7 @@ module InitGame = struct
   let create_briques =
     let create_brick x y width height = Brique (Pair (x, y), Pair (width, height), false) in
     let rec aux col_actuelle ligne_actuelle l =
-      if ligne_actuelle = ConstantesBriques.max_l
- then l
+      if ligne_actuelle = ConstantesBriques.max_l then l
       else if col_actuelle = ConstantesBriques.max_c then aux 0 (ligne_actuelle + 1) l
       else
         let total_width = (float_of_int ConstantesBriques.max_c) *. (InitTailleBriques.x +. ConstantesBriques.espace_briques) -. ConstantesBriques.espace_briques in
@@ -114,38 +111,6 @@ module InitGame = struct
 
   let etat_init = Some (State (balle, raquette, quadtree, false, nb_balles))
 end 
-
-(* --------------------------------------------------------- *)
-(* Vérification des Post-Conditions de "create_briques" (cb) *)
-(* --------------------------------------------------------- *)
-module PostCondCB = struct
-  open List
-
-  (* (1) La liste de briques est de taille max_columns * max_lines *)
-  let post_cb_size l = (length l) = ConstantesBriques.max_c * ConstantesBriques.max_l
-
-  (* (2) Il y a max_c briques par ligne *)
-
-  (* Fonction auxiliaire qui récupère les positions (x,y) des briques *)
-  let get_positions l = List.map (fun (Brique (Pair (rx, ry),_, _)) -> (rx, ry)) l
-
-  (* Fonctions auxiliaires qui récupèrent la liste des x et des y des briques *)
-  let get_x l = List.map (fun (x, _) -> x) l
-  let get_y l = List.map (fun (_, y) -> y) l
-
-  (* Fonction qui vérifie si les briques sont alignées sur une ligne *)
-
-  let post_cb_lines l = 
-    let rec aux l = match l with
-      | [] -> true
-      | h::t -> (length h) = ConstantesBriques.max_c
- && aux t
-    in aux l
-
-  (* (3) Il y a max_l briques par colonne *)
-
-end
-
 
 module Game (F : Frame) = 
 struct
@@ -357,3 +322,21 @@ end
 
 
 
+(* ------------------[Module non utilisé]------------------- *)
+(* Vérification des Post-Conditions de "create_briques" (cb) *)
+(* --------------------------------------------------------- *)
+module PostCondCB = struct
+  open List
+
+  (* (1) La liste de briques est de taille max_columns * max_lines *)
+  let post_cb_size l = (length l) = ConstantesBriques.max_c * ConstantesBriques.max_l
+
+  (* (2) Il y a max_c briques par ligne *)
+
+  (* Fonction auxiliaire qui récupère les positions (x,y) des briques *)
+  let get_positions l = List.map (fun (Brique (Pair (rx, ry),_, _)) -> (rx, ry)) l
+
+  (* Fonctions auxiliaires qui récupèrent la liste des x et des y des briques *)
+  let get_x l = List.map (fun (x, _) -> x) l
+  let get_y l = List.map (fun (_, y) -> y) l
+end
