@@ -126,5 +126,3 @@ La logique du jeu contient des tests intégrés (`ppx_inline_test`) pour les com
 - détection de contact avec les briques
 
 Ce projet constitue donc un exemple concret de conception logicielle réaliste, testée et adaptée à un langage fonctionnel.
-
-Aucun fichier de licence explicite n'a été trouvé dans les éléments examinés pour ce dépôt. Si vous envisagez de réutiliser ou de distribuer le projet publiquement, il convient de confirmer s'il existe une licence prévue avant toute diffusion.
